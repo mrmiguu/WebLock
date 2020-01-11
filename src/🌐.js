@@ -4,28 +4,92 @@ import React, {
   useEffect,
   useState,
   useRef,
+  useCallback,
 } from 'react'
 
-function useMinMaxHeight() {
-  const [minH, setMinH] = useState(window.innerHeight)
-  const [maxH, setMaxH] = useState(window.innerHeight)
+const {
+  MIN_VALUE,
+  MAX_VALUE,
+} = Number
+
+const {
+  matchMedia
+} = window
+
+function useOrientation() {
+
+  const getOrientation = useCallback(
+    () => {
+      const isPortrait = !!matchMedia('(orientation: portrait)').matches
+      const isLandscape = !!matchMedia('(orientation: landscape)').matches
+      return isPortrait ? 'portait' : isLandscape ? 'landscape' : undefined
+    },
+    []
+  )
+
+  const [orientation, setOrientation] = useState(getOrientation())
 
   useEffect(
     () => {
+
       function onResize() {
-        const h = window.innerHeight
-        if (h < minH) setMinH(h)
-        if (h > maxH) setMaxH(h)
+        setOrientation(getOrientation())
       }
+
       window.addEventListener('resize', onResize)
       return () => window.addEventListener('resize', onResize)
+
     },
-    [minH, maxH]
+    []
+  )
+
+  return orientation
+}
+
+function useMinMaxHeight() {
+  const orientation = useOrientation()
+  const [minH, setMinH] = useState(MAX_VALUE)
+  const [maxH, setMaxH] = useState(MIN_VALUE)
+
+  const resetH = useCallback(
+    () => {
+      const h = window.innerHeight
+      setMinH(h < MAX_VALUE ? h : MAX_VALUE)
+      setMaxH(h > MIN_VALUE ? h : MIN_VALUE)
+      // setTimeout(() => alert(`reset window.innerHeight ${h}`), 3000)
+    },
+    []
+  )
+
+  useEffect(
+    () => {
+      resetH()
+    },
+    [orientation]
+  )
+
+  useEffect(
+    () => {
+
+      function onResize() {
+        const h = window.innerHeight
+        setMinH(minH => h < minH ? h : minH)
+        setMaxH(maxH => h > maxH ? h : maxH)
+      }
+
+      onResize()
+
+      window.addEventListener('resize', onResize)
+      return () => window.addEventListener('resize', onResize)
+
+    },
+    []
   )
 
   return {
     minH,
     maxH,
+    orientation,
   }
 }
 
@@ -34,15 +98,20 @@ function useInfo() {
 
   useEffect(
     () => {
-      function onScroll() {
+      function onEvent() {
         setInfo({
           scroll: window.scrollY,
           vh: window.innerHeight,
           body: document.body.offsetHeight,
         })
       }
-      window.addEventListener('scroll', onScroll)
-      return () => window.addEventListener('scroll', onScroll)
+      onEvent()
+      window.addEventListener('scroll', onEvent)
+      window.addEventListener('resize', onEvent)
+      return () => {
+        window.addEventListener('scroll', onEvent)
+        window.addEventListener('resize', onEvent)
+      }
     },
     []
   )
@@ -70,6 +139,7 @@ function WebLock() {
   const {
     minH,
     maxH,
+    orientation,
   } = useMinMaxHeight()
 
   const {
@@ -80,7 +150,7 @@ function WebLock() {
 
   const scrollAtBottom = useScrollAtBottom()
 
-  const bottomBarFound = maxH > minH
+  const bottomBarFound = maxH !== minH
   const noBottomBar = bottomBarFound && vh === maxH
 
   useEffect(
@@ -104,7 +174,7 @@ function WebLock() {
       ref={webLockRef}
       id="🌐🔓"
     >
-      <div className="fixed" hidden>
+      <div className="fixed" /* hidden */>
         <div>scroll: {scroll}</div>
         <div>vh: {vh}</div>
         <div>body: {body}</div>
@@ -112,7 +182,9 @@ function WebLock() {
         <div>scroll at bottom: {JSON.stringify(scrollAtBottom)}</div>
         <div>minH: {minH}</div>
         <div>maxH: {maxH}</div>
+        <div>bottom bar found: {JSON.stringify(bottomBarFound)}</div>
         <div>no bottom bar: {JSON.stringify(noBottomBar)}</div>
+        <div>orientation: {orientation}</div>
       </div>
     </div>
   )
